@@ -6,6 +6,7 @@ import com.github.xiaolyuh.util.StringUtils;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.ScriptOutputType;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -274,6 +275,69 @@ public interface RedisClient {
      * @return List
      */
     List<String> lrange(String key, long start, long end, RedisSerializer valueRedisSerializer);
+
+    /**
+     * 增加hash结构体的字段和值
+     *
+     * @param key       key
+     * @param hashKey   hashKey
+     * @param hashValue hashValue
+     * @return 如果hashKey是散列中的新字段并且设置了value ，则为true 。如果hashKey已存在于哈希中并且值已更新，则返回false
+     */
+    Boolean hset(String key, String hashKey, Object hashValue);
+
+    /**
+     * 批量添加key,value
+     *
+     * @param key key
+     * @param map hash
+     */
+    void hmset(String key, Map<String, Object> map);
+
+    /**
+     * 是否存在hashKey
+     *
+     * @param key     key
+     * @param hashKey hashKey
+     * @return 是否存在
+     */
+    Boolean hexists(String key, String hashKey);
+
+    /**
+     * 对hashKey的value增加指定的值
+     *
+     * @param key     key
+     * @param hashKey hashKey
+     * @param amount  增加值
+     * @return 增加后的hash value
+     */
+    Long hincrby(String key, String hashKey, long amount);
+
+    /**
+     * 获取map
+     *
+     * @param key key
+     * @return map
+     */
+    Map<String, Object> hgetall(String key);
+
+    /**
+     * 获取hashKey对应的值
+     *
+     * @param key     key
+     * @param hashKey hashKey
+     * @return hashValue
+     */
+    Object hget(String key, String hashKey);
+
+    /**
+     * 删除hashKey
+     *
+     * @param key      key
+     * @param hashKeys hashKey
+     * @return 从哈希中删除的字段数，不包括指定但不存在的字段
+     */
+    Long hdel(String key, String... hashKeys);
 
     /**
      * 执行Lua脚本

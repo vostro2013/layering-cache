@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -336,6 +337,27 @@ public class SentinelRedisClient implements RedisClient {
     }
 
     @Override
+    public Set<String> scan(String pattern) {
+        Set<String> keys = new HashSet<>();
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            boolean finished;
+            ScanCursor cursor = ScanCursor.INITIAL;
+            do {
+                KeyScanCursor<byte[]> scanCursor = sync.scan(cursor, ScanArgs.Builder.limit(10000).match(pattern));
+                scanCursor.getKeys().forEach(key -> keys.add(getKeySerializer().deserialize(key, String.class)));
+                finished = scanCursor.isFinished();
+                cursor = ScanCursor.of(scanCursor.getCursor());
+            } while (!finished);
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+        return keys;
+    }
+
+    @Override
     public Long lpush(String key, RedisSerializer valueRedisSerializer, String... values) {
         if (Objects.isNull(values) || values.length == 0) {
             return 0L;
@@ -388,24 +410,98 @@ public class SentinelRedisClient implements RedisClient {
     }
 
     @Override
-    public Set<String> scan(String pattern) {
-        Set<String> keys = new HashSet<>();
+    public Boolean hset(String key, String hashKey, Object hashValue) {
         try {
             RedisCommands<byte[], byte[]> sync = connection.sync();
-            boolean finished;
-            ScanCursor cursor = ScanCursor.INITIAL;
-            do {
-                KeyScanCursor<byte[]> scanCursor = sync.scan(cursor, ScanArgs.Builder.limit(10000).match(pattern));
-                scanCursor.getKeys().forEach(key -> keys.add(getKeySerializer().deserialize(key, String.class)));
-                finished = scanCursor.isFinished();
-                cursor = ScanCursor.of(scanCursor.getCursor());
-            } while (!finished);
+            return sync.hset(getKeySerializer().serialize(key), getKeySerializer().serialize(hashKey), getValueSerializer().serialize(hashValue));
         } catch (SerializationException e) {
             throw e;
         } catch (Exception e) {
             throw new RedisClientException(e.getMessage(), e);
         }
-        return keys;
+
+    }
+
+    @Override
+    public void hmset(String key, Map<String, Object> map) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            Map<byte[], byte[]> value = map.entrySet().stream().collect(Collectors.toMap(e -> getKeySerializer().serialize(e.getKey()), e -> getValueSerializer().serialize(e.getValue())));
+            sync.hmset(getKeySerializer().serialize(key), value);
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Boolean hexists(String key, String hashKey) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            return sync.hexists(getKeySerializer().serialize(key), getKeySerializer().serialize(hashKey));
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Long hincrby(String key, String hashKey, long amount) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            return sync.hincrby(getKeySerializer().serialize(key), getKeySerializer().serialize(hashKey), amount);
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Map<String, Object> hgetall(String key) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            Map<byte[], byte[]> map = sync.hgetall(getKeySerializer().serialize(key));
+            if (null == map) {
+                return null;
+            }
+            return map.entrySet().stream().collect(Collectors.toMap(e -> getKeySerializer().deserialize(e.getKey(), String.class), e -> getValueSerializer().deserialize(e.getValue(), Object.class)));
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Object hget(String key, String hashKey) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            byte[] hashValue = sync.hget(getKeySerializer().serialize(key), getKeySerializer().serialize(hashKey));
+            return getValueSerializer().deserialize(hashValue, Object.class);
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Long hdel(String key, String... hashKeys) {
+        try {
+            RedisCommands<byte[], byte[]> sync = connection.sync();
+            final byte[][] bhashKeys = new byte[hashKeys.length][];
+            for (int i = 0; i < hashKeys.length; i++) {
+                bhashKeys[i] = getKeySerializer().serialize(hashKeys[i]);
+            }
+            return sync.hdel(getKeySerializer().serialize(key), bhashKeys);
+        } catch (SerializationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RedisClientException(e.getMessage(), e);
+        }
     }
 
     @Override
